@@ -41,7 +41,9 @@ public class ArmedForcesService {
     }
 
     public Long recruitUnit(final Long armyId, final Unit unit) {
-        Army army = armedForcesRepository.findById(armyId).orElse(null);
+        Army army =getArmyById(armyId);
+        if (!unit.getType().getArmyType().equals(army.getType()))
+            throw new ResponseStatusException(HttpStatus.UNPROCESSABLE_ENTITY, "Cannot add units of this type " + unit.getType() + " to such Army, Sir!");
         if (unitRepository.countByArmy(army) < 100) {
             unit.setArmy(army);
             return unitRepository.saveAndFlush(unit).getId();
@@ -60,7 +62,10 @@ public class ArmedForcesService {
     }
 
     public void deleteUnitById(Long unitId) {
-        unitRepository.deleteById(unitId);
+        Unit unit = unitRepository.findById(unitId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hmmm. That unit does not seem to exist, Sir!"));
+        unitRepository.delete(unit);
+        deleteArmyIfEmpty(unit.getArmy().getId());
     }
 
     public void deleteTopUnit(Long armyId) {
@@ -68,5 +73,12 @@ public class ArmedForcesService {
         Unit unit = unitRepository.findTopByArmyOrderByCombatPowerDesc(army)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Hmmm. That unit does not seem to exist, Sir!"));
         unitRepository.delete(unit);
+        deleteArmyIfEmpty(armyId);
+    }
+
+    private void deleteArmyIfEmpty(Long armyId) {
+        Army armyToDelete = getArmyById(armyId);
+        if(unitRepository.countByArmy(armyToDelete)==0)
+            armedForcesRepository.delete(armyToDelete);
     }
 }
